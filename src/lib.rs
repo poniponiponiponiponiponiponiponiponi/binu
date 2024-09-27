@@ -26,19 +26,19 @@ pub struct InsertConfig {
 }
 
 #[derive(Debug)]
-pub struct OpenedFile<'a, T: AsRef<Path>> {
+pub struct OpenedFile<'a> {
     pub file: File,
-    pub path: &'a T,
+    pub path: &'a Path,
 }
 
 #[derive(Debug)]
-pub struct Match<'a, T: AsRef<Path>> {
-    pub opened_file: &'a mut OpenedFile<'a, T>,
+pub struct Match<'a> {
+    pub opened_file: &'a mut OpenedFile<'a>,
     pub pattern: &'a [u8],
     pub offset: u64,
 }
 
-impl<'a, T: AsRef<Path>> Iterator for Match<'a, T> {
+impl<'a> Iterator for Match<'a> {
     type Item = u64;
 
     fn next(&mut self) -> Option<Self::Item> {
@@ -58,27 +58,27 @@ impl<'a, T: AsRef<Path>> Iterator for Match<'a, T> {
     }
 }
 
-fn find_matches<'a, T: AsRef<Path>>(
-    opened_file: &'a mut OpenedFile<'a, T>,
+fn find_matches<'a>(
+    opened_file: &'a mut OpenedFile<'a>,
     pattern: &'a [u8]
-) -> Match<'a, T> {
-    Match::<'a, T>{ opened_file, pattern, offset: 0 }
+) -> Match<'a> {
+    Match::<'a>{ opened_file, pattern, offset: 0 }
 }
 
-fn open_file<T: AsRef<Path>>(filename: &T) -> Result<OpenedFile<T>, io::Error> {
-    match File::open(filename) {
+fn open_file<'a>(filename: &'a Path) -> Result<OpenedFile<'a>, io::Error> {
+    match File::open(&filename) {
         Ok(f) => Ok(OpenedFile {file: f, path: filename}),
         Err(e) => {
-            eprintln!("Can't open {} bacause of error: {}", filename.as_ref().display(), e);
+            eprintln!("Can't open {} bacause of error: {}", filename.display(), e);
             Err(e)
         }
     }
 }
 
-fn open_files<T: AsRef<Path>>(filenames: &[T]) -> Result<Vec<OpenedFile<T>>, io::Error> {
+fn open_files<T: AsRef<Path>>(filenames: &[T]) -> Result<Vec<OpenedFile>, io::Error> {
     let mut ret = Vec::new();
     for filename in filenames {
-        let file = open_file(filename)?;
+        let file = open_file(filename.as_ref())?;
         ret.push(file);
     }
     Ok(ret)
@@ -116,7 +116,7 @@ pub fn grep<T: AsRef<Path>>(
     let mut ret = Vec::new();
     let mut files = open_files(filenames)?;
     for file in files.iter_mut() {
-        ret.push((PathBuf::from(file.path.as_ref()), Vec::new()));
+        ret.push((PathBuf::from(file.path), Vec::new()));
         let found_matches: Vec<_> = find_matches(file, pattern).collect();
         for &offset in found_matches.iter() {
             ret.last_mut().unwrap().1.push(offset);
