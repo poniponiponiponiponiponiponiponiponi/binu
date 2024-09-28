@@ -6,11 +6,6 @@ use binu::{GrepConfig, InsertConfig, ReplaceConfig};
 
 #[derive(Parser, Debug)]
 #[command(version, about, long_about = None)]
-#[clap(group(
-    ArgGroup::new("output_level")
-        .required(false)
-        .args(&["verbose", "quiet"]),
-))]
 pub struct Cli {
     /// Quiet output
     #[arg(short, long)]
@@ -41,11 +36,7 @@ pub struct GrepArgs {
     /// and subdirectories.
     #[arg(short, long)]
     pub recursive: bool,
-
-    /// Match regex patterns
-    #[arg(short = 'e', long)]
-    pub regex: bool,
-
+    
     /// Pattern to search for
     pub pattern: String,
 
@@ -60,10 +51,6 @@ pub struct ReplaceArgs {
     /// and subdirectories.
     #[arg(short, long)]
     pub recursive: bool,
-
-    /// Match regex patterns
-#[arg(short = 'e', long)]
-    pub regex: bool,
 
     /// Pattern to replace
     pub pattern: String,
@@ -92,7 +79,11 @@ pub struct ReplaceArgs {
 
     /// File to replace
     #[clap(required = true)]
-    pub filename: PathBuf,
+    pub input_filename: PathBuf,
+
+    /// Output file
+    #[clap(required = true)]
+    pub output_filename: PathBuf,
 }
 
 #[derive(Debug, Args)]
@@ -104,7 +95,11 @@ pub struct InsertArgs {
     pub offset: usize,
 
     /// To which file to insert
-    pub filename: PathBuf,
+    pub input_filename: PathBuf,
+
+    /// Output file
+    #[clap(required = true)]
+    pub output_filename: PathBuf,
 }
 
 impl Cli {
@@ -114,19 +109,19 @@ impl Cli {
                 let grep_config = GrepConfig {
                     quiet: self.quiet,
                     recursive: grep_args.recursive,
-                    regex: grep_args.regex,
                 };
                 binu::grep_command(
                     grep_args.pattern.as_bytes(),
                     &grep_args.filenames,
                     &grep_config,
-                );
+                ).unwrap_or_else(|e| {
+                    eprintln!("Grep encountered error: {}", e);
+                });
             }
             Commands::Replace(replace_args) => {
                 let replace_config = ReplaceConfig {
                     quiet: self.quiet,
                     recursive: replace_args.recursive,
-                    regex: replace_args.regex,
                     nth: replace_args.nth,
                     replace_all: replace_args.replace_all,
                     fill_byte: replace_args.fill_byte,
@@ -135,9 +130,12 @@ impl Cli {
                 binu::replace_command(
                     replace_args.pattern.as_bytes(),
                     replace_args.replace_with.as_bytes(),
-                    &replace_args.filename,
+                    &replace_args.input_filename,
+                    &replace_args.output_filename,
                     &replace_config,
-                );
+                ).unwrap_or_else(|e| {
+                    eprintln!("Replace encountered error: {}", e);
+                });
             }
             Commands::Insert(insert_args) => {
                 let insert_config = InsertConfig {
@@ -146,9 +144,12 @@ impl Cli {
                 binu::insert_command(
                     insert_args.to_insert.as_bytes(),
                     insert_args.offset,
-                    &insert_args.filename,
+                    &insert_args.input_filename,
+                    &insert_args.output_filename,
                     &insert_config,
-                );
+                ).unwrap_or_else(|e| {
+                    eprintln!("Insert encountered error: {}", e);
+                });
             }
         }
     }

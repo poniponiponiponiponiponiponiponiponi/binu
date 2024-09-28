@@ -128,24 +128,81 @@ pub fn grep<T: AsRef<Path>>(
 }
 
 pub fn replace_command(
-    replace: &[u8],
+    to_replace: &[u8],
     replace_with: &[u8],
     input_filename: &Path,
     output_filename: &Path,
     replace_config: &ReplaceConfig,
 ) -> Result<(), io::Error> {
+    if !replace_config.allow_length_change && replace_with.len() > to_replace.len() {
+        eprintln!("Replacing string is too long");
+    }
+    
+    let n = replace(to_replace, replace_with, input_filename, output_filename, replace_config)?;
+    if !replace_config.quiet {
+        if n == 1 {
+            println!("Replaced 1 match successfully");
+        } else {
+            println!("Replaced {} matches successfully", 0);
+        }
+    }
+    
     Ok(())
 }
 
 pub fn replace(
-    replace: &[u8],
+    to_replace: &[u8],
     replace_with: &[u8],
     input_filename: &Path,
     output_filename: &Path,
     replace_config: &ReplaceConfig,
-) -> Result<(), io::Error> {
-    let file = open_file(input_filename)?;
-    Ok(())
+) -> Result<usize, io::Error> {
+    let mut input_file = open_file(input_filename)?;
+    
+    let mut matches_iter = find_matches(&mut input_file, to_replace);
+    let found_matches: Vec<_>;
+
+    // Make it so later replacing the matches is a generic case,
+    // no matter if we're replacing one instance or all instances
+    if !replace_config.replace_all {
+        if let Some(offset) = matches_iter.nth(replace_config.nth) {
+            found_matches = vec![offset];
+        } else {
+            return Ok(0);
+        }
+    } else {
+        found_matches = matches_iter.collect()
+    }
+
+    let to_fill = if replace_config.allow_length_change {
+        0
+    } else {
+        to_replace.len() - replace_with.len()
+    };
+    let mut input_file = File::open(input_filename)?;
+    let mut output_file = File::create(output_filename)?;
+    let mut last_offset = 0;
+    for &offset in found_matches.iter() {
+        if last_offset > offset as usize {
+            continue;
+        }
+        
+        let mut buf = vec![0u8; offset as usize-last_offset];
+        input_file.read_exact(&mut buf)?;
+        output_file.write(&buf)?;
+        
+        input_file.seek_relative(to_replace.len() as i64)?;
+        output_file.write(&replace_with)?;
+        let fill_bytes = vec![replace_config.fill_byte; to_fill];
+        output_file.write(&fill_bytes)?;
+
+        last_offset += buf.len() + to_replace.len();
+    }
+    let mut buf = String::new();
+    input_file.read_to_string(&mut buf)?;
+    output_file.write(buf.as_bytes())?;
+    
+    Ok(found_matches.len())
 }
 
 pub fn insert_command(
@@ -155,7 +212,11 @@ pub fn insert_command(
     output_filename: &Path,
     insert_config: &InsertConfig
 ) -> Result<(), io::Error> {
-    insert(to_insert, offset, input_filename, output_filename, insert_config)?;
+    insert(to_insert, offset, input_filename, output_filename)?;
+    if !insert_config.quiet {
+        println!("Inserting was successful");
+    }
+    
     Ok(())
 }
 
@@ -164,7 +225,6 @@ pub fn insert(
     offset: usize,
     input_filename: &Path,
     output_filename: &Path,
-    insert_config: &InsertConfig
 ) -> Result<(), io::Error> {
     let mut input_file = open_file(input_filename)?;
     let mut output_file = File::create(output_filename)?;
@@ -180,9 +240,5 @@ pub fn insert(
     input_file.file.read_to_string(&mut buf)?;
     output_file.write(buf.as_bytes())?;
 
-    if !insert_config.quiet {
-        println!("Inserting was sucessful");
-    }
-    
     Ok(())
 }
