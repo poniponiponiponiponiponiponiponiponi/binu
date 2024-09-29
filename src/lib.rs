@@ -11,7 +11,6 @@ pub struct GrepConfig {
 #[derive(Default, Debug)]
 pub struct ReplaceConfig {
     pub quiet: bool,
-    pub recursive: bool,
     pub nth: usize,
     pub replace_all: bool,
     pub fill_byte: u8,
@@ -82,12 +81,54 @@ fn open_files<T: AsRef<Path>>(filenames: &[T]) -> Result<Vec<OpenedFile>, io::Er
     Ok(ret)
 }
 
+/// Open a directory recursively, getting all the files in the
+/// directory and its subdirectories. Doesn't work with symlinks. We
+/// make an assumption that the dir argument is a directory.
+fn open_recursively(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
+    let mut ret = Vec::new();
+    for entry in dir.read_dir()? {
+        let entry = entry?;
+        let metadata = entry.metadata()?;
+        if metadata.is_file() {
+            ret.push(entry.path());
+        } else if metadata.is_dir() {
+            ret.append(&mut open_recursively(&entry.path())?);
+        }
+    }
+    
+    Ok(ret)
+}
+
+fn open_all_directories<T: AsRef<Path>>(paths: &[T]) -> Result<Vec<PathBuf>, io::Error> {
+    let mut ret = Vec::new();
+    for path in paths {
+        if path.as_ref().is_dir() {
+            ret.append(&mut open_recursively(path.as_ref())?);
+        } else if path.as_ref().is_file() {
+            ret.push(path.as_ref().to_path_buf());
+        }
+    }
+    
+    Ok(ret)
+}
+
 pub fn grep_command<T: AsRef<Path>>(
     pattern: &[u8],
     filenames: &[T],
     grep_config: &GrepConfig,
 ) -> Result<(), io::Error> {
-    let results = grep(pattern, filenames)?;
+    // Handle directories as paths
+    let files;
+    let paths: Vec::<&Path>;
+    if grep_config.recursive {
+        files = open_all_directories(filenames)?;
+        paths = files.iter().map(|path| path.as_path()).collect::<Vec<&Path>>();
+    } else {
+        paths = filenames.iter().map(|path| path.as_ref()).collect();
+    }
+
+    // Get results
+    let results = grep(pattern, &paths)?;
     let is_empty: bool = results.iter().all(|e| e.1.is_empty());
     if is_empty {
         if !grep_config.quiet {
@@ -95,7 +136,8 @@ pub fn grep_command<T: AsRef<Path>>(
         }
         return Ok(());
     }
-    
+
+    // Pretty print
     for (n, (filename, offsets)) in results.iter().enumerate() {
         println!("{}:", filename.display());
         for (n, offset) in offsets.iter().enumerate() {

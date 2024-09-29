@@ -47,11 +47,6 @@ pub struct GrepArgs {
 
 #[derive(Debug, Args)]
 pub struct ReplaceArgs {
-    /// When a directory is provided, recursively operate on all the files
-    /// and subdirectories.
-    #[arg(short, long)]
-    pub recursive: bool,
-
     /// Pattern to replace
     pub pattern: String,
 
@@ -121,7 +116,6 @@ impl Cli {
             Commands::Replace(replace_args) => {
                 let replace_config = ReplaceConfig {
                     quiet: self.quiet,
-                    recursive: replace_args.recursive,
                     nth: replace_args.nth,
                     replace_all: replace_args.replace_all,
                     fill_byte: replace_args.fill_byte,
