@@ -22,12 +22,15 @@ pub struct InsertConfig {
     pub quiet: bool,
 }
 
+/// Custom struct to bundle an opened file and its path together
 #[derive(Debug)]
 pub struct OpenedFile<'a> {
     pub file: File,
     pub path: &'a Path,
 }
 
+/// Iterator returned by the `find_matches()` function. It helps us to
+/// get all the offsets of the matches of a pattern in an opened file.
 #[derive(Debug)]
 pub struct Match<'a> {
     pub opened_file: &'a mut OpenedFile<'a>,
@@ -35,6 +38,9 @@ pub struct Match<'a> {
     pub offset: u64,
 }
 
+/// Iterator returned by the `open_files()` function. Avoid using
+/// `.collect()`, otherwise we will hit the opened file descriptors
+/// limit.
 #[derive(Debug)]
 pub struct OpenFiles<'a, T: AsRef<Path> + 'a> {
     pub files: &'a [T],
@@ -70,6 +76,7 @@ impl<'a> Iterator for Match<'a> {
             }
             self.opened_file.file.seek(SeekFrom::Start(self.offset)).unwrap();
         }
+        
         None
     }
 }
@@ -91,16 +98,7 @@ fn open_file<'a>(filename: &'a Path) -> Result<OpenedFile<'a>, io::Error> {
     }
 }
 
-fn open_files<T: AsRef<Path>>(filenames: &[T]) -> Result<Vec<OpenedFile>, io::Error> {
-    let mut ret = Vec::new();
-    for filename in filenames {
-        let file = open_file(filename.as_ref())?;
-        ret.push(file);
-    }
-    Ok(ret)
-}
-
-fn open_files2<'a, T: AsRef<Path>>(filenames: &'a [T]) -> OpenFiles<'a, T> {
+fn open_files<'a, T: AsRef<Path>>(filenames: &'a [T]) -> OpenFiles<'a, T> {
     OpenFiles { files: filenames, nth: 0 }
 }
 
@@ -122,6 +120,9 @@ fn open_recursively(dir: &Path) -> Result<Vec<PathBuf>, io::Error> {
     Ok(ret)
 }
 
+/// Same as `open_recursively()`, except we do it for every path in a
+/// slice. A path doesn't need to be a directory, it can be a file -
+/// then it's just added to the returned Vec.
 fn open_all_directories<T: AsRef<Path>>(paths: &[T]) -> Result<Vec<PathBuf>, io::Error> {
     let mut ret = Vec::new();
     for path in paths {
@@ -135,6 +136,8 @@ fn open_all_directories<T: AsRef<Path>>(paths: &[T]) -> Result<Vec<PathBuf>, io:
     Ok(ret)
 }
 
+/// Function for executing the command line grep command. You probably
+/// want to use `grep()` instead.
 pub fn grep_command<T: AsRef<Path>>(
     pattern: &[u8],
     filenames: &[T],
@@ -175,12 +178,14 @@ pub fn grep_command<T: AsRef<Path>>(
     Ok(())
 }
 
+/// Find all occurrences of `pattern` in `filenames`. Return a Vec of
+/// matched offsets.
 pub fn grep<T: AsRef<Path>>(
     pattern: &[u8],
     filenames: &[T],
 ) -> Result<Vec<(PathBuf, Vec<u64>)>, io::Error> {
     let mut ret = Vec::new();
-    for mut file in open_files2(filenames) {
+    for mut file in open_files(filenames) {
         ret.push((PathBuf::from(file.path), Vec::new()));
         let found_matches: Vec<_> = find_matches(&mut file, pattern).collect();
         for &offset in found_matches.iter() {
@@ -191,6 +196,8 @@ pub fn grep<T: AsRef<Path>>(
     Ok(ret)
 }
 
+/// Function for executing the command line replace command. You
+/// probably want to use `replace()` instead.
 pub fn replace_command(
     to_replace: &[u8],
     replace_with: &[u8],
@@ -214,6 +221,9 @@ pub fn replace_command(
     Ok(())
 }
 
+/// Replace the `to_replace` pattern in the file `input_filename` with
+/// bytes specified by `replace_with`. The result in saved in
+/// `output_filename`. Return the number of replaced patterns
 pub fn replace(
     to_replace: &[u8],
     replace_with: &[u8],
@@ -238,6 +248,7 @@ pub fn replace(
         found_matches = matches_iter.collect()
     }
 
+    // Initialize variables for the loop
     let to_fill = if replace_config.allow_length_change {
         0
     } else {
@@ -246,6 +257,10 @@ pub fn replace(
     let mut input_file = File::open(input_filename)?;
     let mut output_file = File::create(output_filename)?;
     let mut last_offset = 0;
+    
+    // Handle replacing the file with copying in this kind of pattern:
+    // file[0:1st_off] + replace_with + file[1st_off+len(replace_with):2nd_off] + ...
+    // Hope you see it, otherwise I don't know how to explain it better with words
     for &offset in found_matches.iter() {
         if last_offset > offset as usize {
             continue;
@@ -262,6 +277,7 @@ pub fn replace(
 
         last_offset += buf.len() + to_replace.len();
     }
+    // Handle the last case which is from the last offset to the end of the file
     let mut buf = String::new();
     input_file.read_to_string(&mut buf)?;
     output_file.write(buf.as_bytes())?;
@@ -269,6 +285,8 @@ pub fn replace(
     Ok(found_matches.len())
 }
 
+/// Function for executing the command line insert command. You
+/// probably want to use `insert()` instead.
 pub fn insert_command(
     to_insert: &[u8],
     offset: usize,
@@ -284,6 +302,8 @@ pub fn insert_command(
     Ok(())
 }
 
+/// Insert bytes from `to_insert` in offset specified in `offset`
+/// counting from 0. Results are saved in `output_filename`.
 pub fn insert(
     to_insert: &[u8],
     offset: usize,
