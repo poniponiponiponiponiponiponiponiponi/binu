@@ -35,6 +35,25 @@ pub struct Match<'a> {
     pub offset: u64,
 }
 
+#[derive(Debug)]
+pub struct OpenFiles<'a, T: AsRef<Path> + 'a> {
+    pub files: &'a [T],
+    pub nth: usize,
+}
+
+impl<'a, T: AsRef<Path> + 'a> Iterator for OpenFiles<'a, T> {
+    type Item = OpenedFile<'a>;
+    fn next(&mut self) -> Option<OpenedFile<'a>> {
+        match self.files.get(self.nth) {
+            Some(filename) => {
+                self.nth += 1;
+                open_file(filename.as_ref()).ok()
+            },
+            None => None,
+        }
+    }
+}
+
 impl<'a> Iterator for Match<'a> {
     type Item = u64;
 
@@ -79,6 +98,10 @@ fn open_files<T: AsRef<Path>>(filenames: &[T]) -> Result<Vec<OpenedFile>, io::Er
         ret.push(file);
     }
     Ok(ret)
+}
+
+fn open_files2<'a, T: AsRef<Path>>(filenames: &'a [T]) -> OpenFiles<'a, T> {
+    OpenFiles { files: filenames, nth: 0 }
 }
 
 /// Open a directory recursively, getting all the files in the
@@ -157,10 +180,9 @@ pub fn grep<T: AsRef<Path>>(
     filenames: &[T],
 ) -> Result<Vec<(PathBuf, Vec<u64>)>, io::Error> {
     let mut ret = Vec::new();
-    let mut files = open_files(filenames)?;
-    for file in files.iter_mut() {
+    for mut file in open_files2(filenames) {
         ret.push((PathBuf::from(file.path), Vec::new()));
-        let found_matches: Vec<_> = find_matches(file, pattern).collect();
+        let found_matches: Vec<_> = find_matches(&mut file, pattern).collect();
         for &offset in found_matches.iter() {
             ret.last_mut().unwrap().1.push(offset);
         }
