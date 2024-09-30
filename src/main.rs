@@ -1,6 +1,6 @@
 mod command;
 
-use crate::command::{Cli, Commands};
+use crate::command::Cli;
 
 use clap::Parser;
 
