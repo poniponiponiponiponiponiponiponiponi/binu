@@ -44,9 +44,35 @@ pub fn insert(
     input_file.file.read_exact(&mut buf)?;
     output_file.write(&buf)?;
     output_file.write(&to_insert)?;
-    let mut buf = String::new();
-    input_file.file.read_to_string(&mut buf)?;
-    output_file.write(buf.as_bytes())?;
+    let mut buf = Vec::new();
+    input_file.file.read_to_end(&mut buf)?;
+    output_file.write(&buf)?;
 
     Ok(())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+    use crate::grep;
+
+    #[test]
+    fn simple_insert_test() {
+        insert(
+            b"meow",
+            0,
+            Path::new("test_files/file_three"),
+            Path::new("test_files/file_three_insert")
+        ).expect("Probably a file related error");
+
+        let file = vec!["test_files/file_three_insert"];
+        let res = grep::grep(b"meow", &file).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![0]);
+
+        let res = grep::grep(b"\x00", &file).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![4, 5]);
+    }
 }
