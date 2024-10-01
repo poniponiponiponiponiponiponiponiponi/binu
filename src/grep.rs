@@ -68,3 +68,36 @@ pub fn grep<T: AsRef<Path>>(
     
     Ok(ret)
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn simple_grep_test() {
+        let files = vec!["test_files/file_one"];
+        let res = grep(b"nya", &files).expect("Probably file not found");
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![
+            3, 9, 12, 19, 22, 32, 43, 48, 55, 58, 64, 67, 74, 77, 84, 94, 104, 109
+        ]);
+    }
+
+    #[test]
+    fn simple_grep_test_two() {
+        let files = vec!["test_files/file_three"];
+        let res = grep(b"\x00", &files).expect("Probably file not found");
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![0, 1]);
+    }
+
+    #[test]
+    fn simple_grep_test_multiple_files() {
+        let files = vec!["test_files/file_one", "test_files/file_two", "test_files/file_three"];
+        let res = grep(b"be", &files).expect("Probably file not found");
+        assert_eq!(res.len(), 3);
+        assert_eq!(res[0].1, vec![99]);
+        assert_eq!(res[1].1, vec![12]);
+        assert_eq!(res[2].1, vec![]);
+    }
+}
