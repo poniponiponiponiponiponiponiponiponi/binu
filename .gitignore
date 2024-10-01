@@ -1,2 +1,9 @@
 target/
 test_files/file_three_insert
+test_files/file_three_replace
+test_files/file_two_replace
+test_files/file_two_replace_all
+test_files/file_two_replace_nth
+test_files/file_two_replace_fill_byte
+test_files/file_two_replace_length_change
+

@@ -95,9 +95,109 @@ pub fn replace(
         last_offset += buf.len() + to_replace.len();
     }
     // Handle the last case which is from the last offset to the end of the file
-    let mut buf = String::new();
-    input_file.read_to_string(&mut buf)?;
-    output_file.write(buf.as_bytes())?;
+    let mut buf = Vec::new();
+    input_file.read_to_end(&mut buf)?;
+    output_file.write(&buf)?;
     
     Ok(found_matches.len())
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use std::path::Path;
+    use crate::grep;
+
+    #[test]
+    fn simple_replace_test() {
+        let cfg = ReplaceConfig { ..Default::default() };
+        replace(
+            b"\x00\x00\x01\x01",
+            b"meow",
+            Path::new("test_files/file_three"),
+            Path::new("test_files/file_three_replace"),
+            &cfg
+        ).expect("Probably a file related error");
+
+        let file = vec!["test_files/file_three_replace"];
+        let res = grep::grep(b"meow", &file).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![0]);
+
+        let res = grep::grep(b"\xfe", &file).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![4]);
+    }
+
+    #[test]
+    fn replace_test_replace_all() {
+        let cfg = ReplaceConfig { replace_all: true, ..Default::default() };
+        replace(
+            b"20%",
+            b"PI%",
+            Path::new("test_files/file_two"),
+            Path::new("test_files/file_two_replace_all"),
+            &cfg
+        ).expect("Probably a file related error");
+
+        let file = vec!["test_files/file_two_replace_all"];
+        let res = grep::grep(b"PI%", &file).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![21, 53, 85, 117]);
+    }
+
+    #[test]
+    fn replace_test_nth() {
+        let cfg = ReplaceConfig { nth: 1, ..Default::default() };
+        replace(
+            b"20%",
+            b"PI%",
+            Path::new("test_files/file_two"),
+            Path::new("test_files/file_two_replace_nth"),
+            &cfg
+        ).expect("Probably a file related error");
+
+        let file = vec!["test_files/file_two_replace_nth"];
+        let res = grep::grep(b"PI%", &file).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![53]);
+    }
+
+    #[test]
+    fn replace_test_fill_byte() {
+        let cfg = ReplaceConfig { fill_byte: b'%', ..Default::default() };
+        replace(
+            b"20%",
+            b"PI",
+            Path::new("test_files/file_two"),
+            Path::new("test_files/file_two_replace_fill_byte"),
+            &cfg
+        ).expect("Probably a file related error");
+
+        let file = vec!["test_files/file_two_replace_fill_byte"];
+        let res = grep::grep(b"PI%", &file).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![21]);
+    }
+
+    #[test]
+    fn replace_test_length_change() {
+        let cfg = ReplaceConfig { allow_length_change: true, ..Default::default() };
+        replace(
+            b"20%",
+            b"100%",
+            Path::new("test_files/file_two"),
+            Path::new("test_files/file_two_replace_length_change"),
+            &cfg
+        ).expect("Probably a file related error");
+
+        let file = vec!["test_files/file_two_replace_length_change"];
+        let res = grep::grep(b"100%", &file).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![21]);
+
+        let res = grep::grep(b"20%", &file).unwrap();
+        assert_eq!(res.len(), 1);
+        assert_eq!(res[0].1, vec![54, 86, 118]);
+    }
 }

@@ -97,7 +97,7 @@ mod tests {
         let res = grep(b"be", &files).expect("Probably file not found");
         assert_eq!(res.len(), 3);
         assert_eq!(res[0].1, vec![99]);
-        assert_eq!(res[1].1, vec![12]);
+        assert_eq!(res[1].1, vec![12, 44, 76, 108]);
         assert_eq!(res[2].1, vec![]);
     }
 }
