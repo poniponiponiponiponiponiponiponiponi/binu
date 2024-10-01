@@ -31,7 +31,7 @@ pub fn replace_command(
         if n == 1 {
             println!("Replaced 1 match successfully");
         } else {
-            println!("Replaced {} matches successfully", 0);
+            println!("Replaced {} matches successfully", n);
         }
     }
     
