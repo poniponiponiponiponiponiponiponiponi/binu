@@ -68,8 +68,8 @@ pub fn find_matches<'a>(
     Match::<'a>{ opened_file, pattern, offset: 0 }
 }
 
-pub fn open_file<'a>(filename: &'a Path) -> Result<OpenedFile<'a>, io::Error> {
-    match File::open(&filename) {
+pub fn open_file(filename: &Path) -> Result<OpenedFile<'_>, io::Error> {
+    match File::open(filename) {
         Ok(f) => Ok(OpenedFile {file: f, path: filename}),
         Err(e) => {
             eprintln!("Can't open {} bacause of error: {}", filename.display(), e);
@@ -78,7 +78,7 @@ pub fn open_file<'a>(filename: &'a Path) -> Result<OpenedFile<'a>, io::Error> {
     }
 }
 
-pub fn open_files<'a, T: AsRef<Path>>(filenames: &'a [T]) -> OpenFiles<'a, T> {
+pub fn open_files<T: AsRef<Path>>(filenames: &[T]) -> OpenFiles<'_, T> {
     OpenFiles { files: filenames, nth: 0 }
 }
 

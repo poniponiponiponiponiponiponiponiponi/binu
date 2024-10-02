@@ -42,11 +42,11 @@ pub fn insert(
     // A simple solution would be to read the file in chunks.
     let mut buf = vec![0u8; offset];
     input_file.file.read_exact(&mut buf)?;
-    output_file.write(&buf)?;
-    output_file.write(&to_insert)?;
+    output_file.write_all(&buf)?;
+    output_file.write_all(to_insert)?;
     let mut buf = Vec::new();
     input_file.file.read_to_end(&mut buf)?;
-    output_file.write(&buf)?;
+    output_file.write_all(&buf)?;
 
     Ok(())
 }

@@ -85,19 +85,19 @@ pub fn replace(
         
         let mut buf = vec![0u8; offset as usize-last_offset];
         input_file.read_exact(&mut buf)?;
-        output_file.write(&buf)?;
+        output_file.write_all(&buf)?;
         
         input_file.seek_relative(to_replace.len() as i64)?;
-        output_file.write(&replace_with)?;
+        output_file.write_all(replace_with)?;
         let fill_bytes = vec![replace_config.fill_byte; to_fill];
-        output_file.write(&fill_bytes)?;
+        output_file.write_all(&fill_bytes)?;
 
         last_offset += buf.len() + to_replace.len();
     }
     // Handle the last case which is from the last offset to the end of the file
     let mut buf = Vec::new();
     input_file.read_to_end(&mut buf)?;
-    output_file.write(&buf)?;
+    output_file.write_all(&buf)?;
     
     Ok(found_matches.len())
 }
