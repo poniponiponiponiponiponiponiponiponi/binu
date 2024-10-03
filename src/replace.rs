@@ -1,5 +1,5 @@
 use std::io;
-use std::io::{Write, Seek, Read};
+use std::io::{Write, Seek, Read, BufReader, BufWriter};
 use std::fs::File;
 use std::path::Path;
 use crate::util;
@@ -71,8 +71,8 @@ pub fn replace(
     } else {
         to_replace.len() - replace_with.len()
     };
-    let mut input_file = File::open(input_filename)?;
-    let mut output_file = File::create(output_filename)?;
+    let mut input_file = BufReader::new(File::open(input_filename)?);
+    let mut output_file = BufWriter::new(File::create(output_filename)?);
     let mut last_offset = 0;
     
     // Handle replacing the file with copying in this kind of pattern:

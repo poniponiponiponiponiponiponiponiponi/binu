@@ -1,11 +1,11 @@
 use std::fs::File;
-use std::io::{self, Read, Seek, SeekFrom};
+use std::io::{self, BufReader, Read, Seek, SeekFrom};
 use std::path::{PathBuf, Path};
 
 /// Custom struct to bundle an opened file and its path together
 #[derive(Debug)]
 pub struct OpenedFile<'a> {
-    pub file: File,
+    pub file: BufReader<File>,
     pub path: &'a Path,
 }
 
@@ -48,13 +48,12 @@ impl<'a> Iterator for Match<'a> {
         // This is a slow O(n^2) way to do it. Obviously we can be smarter about it,
         // using a proper string-searching algorithm
         let mut buf = vec![0u8; pattern_len];
-        self.opened_file.file.seek(SeekFrom::Start(self.offset)).unwrap();
         while let Ok(()) = self.opened_file.file.read_exact(&mut buf) {
             self.offset += 1;
+            self.opened_file.file.seek_relative(-(pattern_len as i64)+1).unwrap();
             if buf == self.pattern {
                 return Some(self.offset-1);
             }
-            self.opened_file.file.seek(SeekFrom::Start(self.offset)).unwrap();
         }
         
         None
@@ -70,7 +69,7 @@ pub fn find_matches<'a>(
 
 pub fn open_file(filename: &Path) -> Result<OpenedFile<'_>, io::Error> {
     match File::open(filename) {
-        Ok(f) => Ok(OpenedFile {file: f, path: filename}),
+        Ok(f) => Ok(OpenedFile {file: BufReader::new(f), path: filename}),
         Err(e) => {
             eprintln!("Can't open {} bacause of error: {}", filename.display(), e);
             Err(e)

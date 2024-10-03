@@ -1,6 +1,6 @@
 use std::io;
 use std::path::Path;
-use std::io::{Write, Read};
+use std::io::{Write, Read, BufWriter};
 use std::fs::File;
 use crate::util;
 
@@ -35,7 +35,7 @@ pub fn insert(
     output_filename: &Path,
 ) -> Result<(), io::Error> {
     let mut input_file = util::open_file(input_filename)?;
-    let mut output_file = File::create(output_filename)?;
+    let mut output_file = BufWriter::new(File::create(output_filename)?);
 
     // This will crash if there's not enough RAM but it's good enough for now.
     // Why Rust doesn't have sendfile(2)?!
